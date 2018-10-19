@@ -39,6 +39,8 @@ public class Config
     private String configLocation = null;
     private String prefix, altprefix, token, owner, success, warning, error, game, 
             help, loadingEmoji, searchingEmoji;
+    private String niconicoId = null;
+    private String niconicoPassword = null;
     private boolean stay, dbots, songingame, useEval, npimages;
     private long maxSeconds;
     private OnlineStatus status = OnlineStatus.UNKNOWN;
@@ -114,6 +116,12 @@ public class Config
                         break;
                     case "status":
                         status = OnlineStatus.fromKey(value);
+                        break;
+                    case "niconicoid":
+                        niconicoId = value;
+                        break;
+                    case "niconicopassword":
+                        niconicoPassword = value;
                         break;
                 }
             }
@@ -284,7 +292,15 @@ public class Config
     {
         return status;
     }
-    
+
+    public String getNiconicoId() {
+        return niconicoId;
+    }
+
+    public String getNiconicoPassword() {
+        return niconicoPassword;
+    }
+
     private void alert(String message)
     {
         if(nogui)

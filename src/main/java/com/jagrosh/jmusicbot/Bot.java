@@ -15,6 +15,7 @@
  */
 package com.jagrosh.jmusicbot;
 
+import com.jagrosh.jmusicbot.nico.NicoAudioSourceManager;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
 import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
@@ -101,6 +102,11 @@ public class Bot extends ListenerAdapter {
         this.settings = new HashMap<>();
         this.lastNP = new HashMap<>();
         manager = new DefaultAudioPlayerManager();
+        if(config.getNiconicoId() != null && config.getNiconicoPassword() != null) {
+            manager.registerSourceManager(new NicoAudioSourceManager(config.getNiconicoId(), config.getNiconicoPassword()));
+            LoggerFactory.getLogger("Bot").info("register NicoAudioSourceManager success!!");
+        }
+
         threadpool = Executors.newSingleThreadScheduledExecutor();
         AudioSourceManagers.registerRemoteSources(manager);
         AudioSourceManagers.registerLocalSource(manager);
@@ -127,7 +133,7 @@ public class Bot extends ListenerAdapter {
     {
         return jda;
     }
-    
+
     public EventWaiter getWaiter()
     {
         return waiter;
