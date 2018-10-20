@@ -37,14 +37,16 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicNameValuePair;
+import org.json.JSONObject;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.parser.Parser;
+import org.jsoup.select.Elements;
 
 public class NicoAudioSourceManager implements AudioSourceManager, HttpConfigurable {
-    private static final String TRACK_URL_REGEX = "^(?:http://|https://|)(?:www\\.|)nicovideo\\.jp/watch/(sm[0-9]+)(?:\\?.*|)$";
-    private static final Pattern trackUrlPattern = Pattern.compile("^(?:http://|https://|)(?:www\\.|)nicovideo\\.jp/watch/(sm[0-9]+)(?:\\?.*|)$");
+    private static final String TRACK_URL_REGEX = "^(?:http://|https://|)(?:www\\.|)nicovideo\\.jp/watch/(sm[0-9]+|so[0-9]+|[0-9]+)(?:\\?.*|)$";
+    private static final Pattern trackUrlPattern = Pattern.compile("^(?:http://|https://|)(?:www\\.|)nicovideo\\.jp/watch/(sm[0-9]+|so[0-9]+|[0-9]+)(?:\\?.*|)$");
     private final String email;
     private final String password;
     private final HttpInterfaceManager httpInterfaceManager;
@@ -131,10 +133,12 @@ public class NicoAudioSourceManager implements AudioSourceManager, HttpConfigura
         Iterator var3 = document.select(":root > thumb").iterator();
         if (var3.hasNext()) {
             Element element = (Element)var3.next();
-            String uploader = element.select("user_nickname").first().text();
+            Elements nickname = element.select("user_nickname");
+            nickname.isEmpty();
+            String uploader = nickname.isEmpty() ? element.select("ch_name").first().text() : nickname.first().text();
             String title = element.select("title").first().text();
             long duration = DataFormatTools.durationTextToMillis(element.select("length").first().text());
-            if(element.select("movie_type").first().text().equals("flv") || element.select("no_live_play").first().text().equals("1")) {
+            if(this.isOldVideoServer(videoId)) {
                 return new NicoAudioTrackOld(new AudioTrackInfo(title, uploader, duration, videoId, false, getWatchUrl(videoId)), this);
             } else {
                 return new NicoAudioTrack(new AudioTrackInfo(title, uploader, duration, videoId, false, getWatchUrl(videoId)), this);
@@ -142,6 +146,34 @@ public class NicoAudioSourceManager implements AudioSourceManager, HttpConfigura
         } else {
             return null;
         }
+    }
+
+    private boolean isOldVideoServer(String videoId) {
+        try {
+            this.checkLoggedIn();
+            HttpInterface httpInterface = this.getHttpInterface();
+
+            HttpGet request = new HttpGet("https://www.nicovideo.jp/watch/" + videoId);
+            request.setHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.54 Safari/537.36");
+            CloseableHttpResponse response = httpInterface.execute(request);
+            int statusCode = response.getStatusLine().getStatusCode();
+            if (statusCode != 200) {
+                return false;
+            }
+
+            Document doc = Jsoup.parse(convertStreamToString(response.getEntity().getContent()));
+            Elements et = doc.select("#js-initial-watch-data");
+            for (Element headline : et) {
+                String data = headline.attr("data-api-data");
+
+                JSONObject json = new JSONObject(data);
+                JSONObject video = json.getJSONObject("video");
+                return video.get("dmcInfo") == JSONObject.NULL;
+            }
+        } catch (IOException ex) {
+            return false;
+        }
+        return false;
     }
 
     public boolean isTrackEncodable(AudioTrack track) {
@@ -241,6 +273,11 @@ public class NicoAudioSourceManager implements AudioSourceManager, HttpConfigura
 
     private static String getWatchUrl(String videoId) {
         return "http://www.nicovideo.jp/watch/" + videoId;
+    }
+
+    static String convertStreamToString(java.io.InputStream is) {
+        java.util.Scanner s = new java.util.Scanner(is).useDelimiter("\\A");
+        return s.hasNext() ? s.next() : "";
     }
 }
 
